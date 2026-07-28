@@ -86,15 +86,21 @@ export default function Home() {
   const [form, setForm] = useState(initialForm);
 
   useEffect(() => {
-    const saved = localStorage.getItem("emb_transactions");
-    if (saved) setTransactions(JSON.parse(saved));
+    async function loadTransactions() {
+      try {
+        const res = await fetch("/api/transactions");
+        if (!res.ok) throw new Error("Failed to load transactions");
+        const data: Transaction[] = await res.json();
+        setTransactions(data);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadTransactions();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("emb_transactions", JSON.stringify(transactions));
-  }, [transactions]);
-
-  function addTransaction(e: React.FormEvent) {
+  async function addTransaction(e: React.FormEvent) {
     e.preventDefault();
 
     if (
@@ -109,8 +115,7 @@ export default function Home() {
       return;
     }
 
-    const newTransaction: Transaction = {
-      id: crypto.randomUUID(),
+    const newTransaction = {
       date: form.date,
       orNumber: form.orNumber,
       payor: form.payor,
@@ -120,13 +125,37 @@ export default function Home() {
       remarks: form.remarks,
     };
 
-    setTransactions([newTransaction, ...transactions]);
-    setForm(initialForm);
+    try {
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTransaction),
+      });
+
+      if (!res.ok) throw new Error("Failed to save transaction");
+
+      const saved: Transaction = await res.json();
+      setTransactions([saved, ...transactions]);
+      setForm(initialForm);
+    } catch (error) {
+      console.error(error);
+      alert("Unable to save transaction. Check console for details.");
+    }
   }
 
-  function deleteTransaction(id: string) {
-    if (confirm("Delete this transaction?")) {
+  async function deleteTransaction(id: string) {
+    if (!confirm("Delete this transaction?")) return;
+
+    try {
+      const res = await fetch(`/api/transactions/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete transaction");
       setTransactions(transactions.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Unable to delete transaction. Check console for details.");
     }
   }
 
@@ -301,6 +330,30 @@ export default function Home() {
               />
             </div>
           </form>
+          import { addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+<button
+  onClick={async () => {
+    try {
+      const docRef = await addDoc(
+        collection(db, "transactions"),
+        {
+          test: true,
+          createdAt: new Date(),
+        }
+      );
+
+      console.log("SUCCESS", docRef.id);
+      alert("Firebase Connected!");
+    } catch (err) {
+      console.error(err);
+      alert("Firebase Failed!");
+    }
+  }}
+>
+  Test Firebase
+</button>
         </section>
 
         <section className="rounded-lg bg-white p-5 shadow">
